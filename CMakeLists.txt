@@ -19,8 +19,8 @@ include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 # Genericki plugin (test primer)
-add_llvm_library(LLVMExamplePass MODULE
-        src/Example.cpp
+add_llvm_library(MyDeadCodeEliminationPass MODULE
+        src/MyDeadCodeEliminationPass.cpp
 
         PLUGIN_TOOL
         opt
