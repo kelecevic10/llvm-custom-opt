@@ -38,6 +38,7 @@ void MyCFG::CreateTransposeCFG(Function &F) {
     }
 }
 
+// starts dfs from the start block and fills the visited set
 void MyCFG::TraverseGraph() {
     DFS(StartBlock);
 }
@@ -51,6 +52,7 @@ void MyCFG::DFS(BasicBlock* Current) {
     }
 }
 
+// returns the reverse topological order of the CFG using BFS from the end block
 std::vector<BasicBlock *> MyCFG::GetTraverseOrder() {
     std::queue<BasicBlock *> q;
     std::unordered_set<BasicBlock *> returnVal;
