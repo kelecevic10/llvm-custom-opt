@@ -21,6 +21,7 @@ add_definitions(${LLVM_DEFINITIONS})
 # Genericki plugin (test primer)
 add_llvm_library(MyDeadCodeEliminationPass MODULE
         src/MyDeadCodeEliminationPass.cpp
+        src/MyCFG.cpp
 
         PLUGIN_TOOL
         opt
