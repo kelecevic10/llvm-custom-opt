@@ -9,8 +9,6 @@
 #include "llvm/IR/Function.h"
 #include "MyCFG.h"
 
-// TODO: Include MyCFG.h in CMakeLists.txt
-
 using namespace llvm;
 
 namespace {
@@ -34,6 +32,7 @@ namespace {
         }
 
         void EliminateDeadInstructions(Function &F) {
+
             InstructionsToRemove.clear();
 
             for (BasicBlock& BB: F) {
@@ -78,6 +77,7 @@ namespace {
             }
 
             for (Instruction* I: InstructionsToRemove) {
+                errs() << "[dce: " << F.getName() << "]: Instruction " << *I << " deleted\n";
                 I->eraseFromParent();
             }
         }
@@ -86,7 +86,6 @@ namespace {
             std::vector<BasicBlock *> UnreachableBlocks;
             MyCFG *CFG = new MyCFG(F);
 
-            // TODO: Check if this call is correct
             CFG->TraverseGraph();
 
             for (BasicBlock &BB : F) {
@@ -100,6 +99,7 @@ namespace {
             }
 
             for (BasicBlock *UnreachableBlock : UnreachableBlocks) {
+                errs() << "[dce]: block " << *UnreachableBlock << " eliminated\n";
                 UnreachableBlock->eraseFromParent();
             }
         }
@@ -107,7 +107,11 @@ namespace {
 
 
         bool runOnFunction(Function &F) override {
-            // errs() << "[dead-code-elimination-pass] Running on function: " << F.getName() << "\n";
+            // clear maps so old values (from the others funcs) don't influence current func info
+            Variables.clear();
+            VariablesMap.clear();
+            InstructionsToRemove.clear();
+
             do {
                 InstructionEliminated = false;
                 EliminateDeadInstructions(F);
