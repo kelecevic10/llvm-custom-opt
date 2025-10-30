@@ -7,6 +7,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "MyCFG.h"
 
 using namespace llvm;
@@ -33,7 +34,6 @@ namespace {
 
         void EliminateDeadInstructions(Function &F) {
 
-            // TODO: chech if Variables and VariablesMap should be cleared here
             InstructionsToRemove.clear();
 
             // for each var, save the last store instruction
@@ -170,6 +170,33 @@ namespace {
             }
         }
 
+        void SimplifyRedundantBranches(Function &F) {
+            std::vector<BranchInst *> RedundantBranches;
+
+            for (BasicBlock &BB: F) {
+                Instruction *Term = BB.getTerminator();
+                if (auto *Br = dyn_cast<BranchInst>(Term)) {
+                    if (Br->isConditional()) {
+                        BasicBlock *TrueDest = Br->getSuccessor(0);
+                        BasicBlock *FalseDest = Br->getSuccessor(1);
+
+                        if (TrueDest == FalseDest) {
+                            IRBuilder<> Builder(Br);
+                            Builder.CreateBr(TrueDest);
+                            Br->eraseFromParent();
+
+                            errs() << "[dce]: redundant branch eliminated\n";
+                            InstructionEliminated = true;
+
+                            // leave the loop because the structure of the function has changed
+                            break;
+                        }
+                    }
+                }
+            }
+
+        }
+
         bool runOnFunction(Function &F) override {
             // clear maps so old values (from the others funcs) don't influence current func info
             Variables.clear();
@@ -181,6 +208,7 @@ namespace {
                 EliminateDeadInstructions(F);
                 EliminateUnreachableInstructions(F);
                 EliminateEmptyBlocks(F);
+                SimplifyRedundantBranches(F);
             } while (InstructionEliminated);
 
             return false;
