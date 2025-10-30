@@ -16,7 +16,7 @@ namespace {
 
         std::unordered_map<Value *, bool> Variables;            // stores potentially dead instructions
         std::unordered_map<Value *, Value *> VariablesMap;
-        std::vector<Instruction *> InstructionsToRemove;
+        std::set<Instruction *> InstructionsToRemove;
         bool InstructionEliminated;
 
         static char ID;
@@ -34,6 +34,37 @@ namespace {
         void EliminateDeadInstructions(Function &F) {
 
             InstructionsToRemove.clear();
+
+            // for each var, save the last store instruction
+            std::unordered_map<Value *, StoreInst *> LastStore;
+
+            for (BasicBlock &BB: F) {
+                for (Instruction &I: BB) {
+                    if (auto *store = dyn_cast<StoreInst>(&I)) {
+                        Value *ptr = store->getOperand(1);
+
+                        // if the store instruction already exists for this pointer,
+                        //  the old store instruction is dead
+                        if (LastStore.find(ptr) != LastStore.end()) {
+                            errs() << "[dse: " << F.getName() << "]: Dead store detected and removed -> " << *LastStore[ptr] << "\n";
+                            InstructionsToRemove.insert(LastStore[ptr]);
+                        }
+
+                        LastStore[ptr] = store;
+                    }
+                    // load instruction means that the value is read, so we remove the LastStore active pointer
+                    else if (auto *load = dyn_cast<LoadInst>(&I)) {
+                        Value* ptr = load->getOperand(0);
+                        LastStore.erase(ptr);
+                    }
+                }
+            }
+
+            // at the end of the pass above, all store instructions that remain
+            // in the LastStore map are never used (there is no load instruction that uses them)
+            for (auto& entry: LastStore) {
+                InstructionsToRemove.insert(entry.second);
+            }
 
             for (BasicBlock& BB: F) {
                 for (Instruction& I: BB) {
@@ -62,11 +93,11 @@ namespace {
                     // we delete store instruction only when it's first operand is a dead variable - it's result is not used
                     // for all the other instruction, we just delete it if it's result (stored in the &I pointer) is dead
                     if (isa<StoreInst>(&I) && Variables.find(I.getOperand(1)) != Variables.end() && !Variables[I.getOperand(1)]) {
-                        InstructionsToRemove.push_back(&I);
+                        InstructionsToRemove.insert(&I);
                     }
                     else {
                         if (Variables.find(&I) != Variables.end() && !Variables[&I]) {
-                            InstructionsToRemove.push_back(&I);
+                            InstructionsToRemove.insert(&I);
                         }
                     }
                 }
