@@ -33,6 +33,7 @@ namespace {
 
         void EliminateDeadInstructions(Function &F) {
 
+            // TODO: chech if Variables and VariablesMap should be cleared here
             InstructionsToRemove.clear();
 
             // for each var, save the last store instruction
@@ -133,9 +134,41 @@ namespace {
                 errs() << "[dce]: block " << *UnreachableBlock << " eliminated\n";
                 UnreachableBlock->eraseFromParent();
             }
+
+            delete CFG;
         }
 
+        void EliminateEmptyBlocks(Function &F) {
+            std::vector<BasicBlock *> EmptyBlocks;
 
+            for (BasicBlock &BB : F) {
+                // skip entry block
+                if (&BB == &F.getEntryBlock())
+                    continue;
+
+                // if a block has only 1 instruction and it is the unconditional branch
+                if (BB.size() == 1) {
+                    Instruction *Term = BB.getTerminator();
+                    if (auto *Br = dyn_cast<BranchInst>(Term)) {
+                        if (Br->isUnconditional()) {
+                            BasicBlock *Succ = Br->getSuccessor(0);
+                            BB.replaceAllUsesWith(Succ);
+                            EmptyBlocks.push_back(&BB);
+                            errs() << "[dce]: block " << BB.getName() << " eliminated"
+                                    << "redirected to: " << Succ->getName() << "\n";
+                        }
+                    }
+                }
+
+            }
+
+            if (!EmptyBlocks.empty()) {
+                InstructionEliminated = true;
+                for (BasicBlock *EmptyBlock : EmptyBlocks) {
+                    EmptyBlock->eraseFromParent();
+                }
+            }
+        }
 
         bool runOnFunction(Function &F) override {
             // clear maps so old values (from the others funcs) don't influence current func info
@@ -147,6 +180,7 @@ namespace {
                 InstructionEliminated = false;
                 EliminateDeadInstructions(F);
                 EliminateUnreachableInstructions(F);
+                EliminateEmptyBlocks(F);
             } while (InstructionEliminated);
 
             return false;
